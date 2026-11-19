@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { CPSAnalysisResult } from "@/types/cps";
 
 export const runtime = "nodejs";
@@ -303,7 +303,6 @@ export async function POST(request: NextRequest) {
         system_instruction: systemInstruction,
         generation_config: {
           temperature: 0.1, // Strict temperature to prevent figure hallucination
-          thinking_level: "MINIMAL", // Prevents slow token generation to avoid Vercel 60s timeout
         },
         response_format: {
           type: "text",
@@ -335,9 +334,6 @@ export async function POST(request: NextRequest) {
           temperature: 0.1,
           responseMimeType: "application/json",
           responseSchema: cpsJsonSchema,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.MINIMAL,
-          },
         },
       });
 
