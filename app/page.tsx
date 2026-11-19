@@ -36,6 +36,7 @@ export default function CPSAnalyzerPage() {
   const [activeTab, setActiveTab] = useState<"4m" | "business" | "welfare" | "cps_summary">("4m");
   const [copySuccess, setCopySuccess] = useState(false);
   const [isDownloadingDocx, setIsDownloadingDocx] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<"gemini-3.5-flash-lite" | "gemini-3.8-flash">("gemini-3.5-flash-lite");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +117,7 @@ export default function CPSAnalyzerPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("model", selectedModel);
 
       const response = await fetch("/api/analyze", {
         method: "POST",
@@ -359,6 +361,44 @@ export default function CPSAnalyzerPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Model & Speed Selection */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-center sm:text-left">
+                <p className="text-xs font-bold text-slate-800 flex items-center justify-center sm:justify-start gap-1.5">
+                  ⚡ ความเร็วในการประมวลผล (AI Model):
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {selectedModel === "gemini-3.5-flash-lite"
+                    ? "โหมดเร็วพิเศษ: ใช้เวลาประมาณ 10-20 วินาที ป้องกัน Timeout บน Vercel ได้อย่างดีเยี่ยม"
+                    : "โหมดวิเคราะห์ลึก: ให้ความละเอียดสูง เหมาะกับไฟล์ขนาดเล็กหรือรันบนคอมพิวเตอร์"}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSelectedModel("gemini-3.5-flash-lite")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    selectedModel === "gemini-3.5-flash-lite"
+                      ? "bg-blue-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  ⚡ ประมวลผลเร็ว (แนะนำ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedModel("gemini-3.8-flash")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    selectedModel === "gemini-3.8-flash"
+                      ? "bg-blue-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🧠 วิเคราะห์ลึก
+                </button>
               </div>
             </div>
 

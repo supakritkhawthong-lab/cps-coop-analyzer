@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { CPSAnalysisResult } from "@/types/cps";
 
 export const runtime = "nodejs";
@@ -273,8 +273,9 @@ export async function POST(request: NextRequest) {
     // Initialize GoogleGenAI SDK client
     const ai = new GoogleGenAI({ apiKey });
 
-    // Use gemini-3.8-flash as the latest standard model (or custom override from env)
-    const modelName = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+    // Use gemini-3.5-flash-lite as the fast default for Vercel Serverless (avoids 60s timeout), or gemini-3.8-flash if requested
+    const requestedModel = formData.get("model") as string | null;
+    const modelName = requestedModel || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
     const userPrompt = `โปรดวิเคราะห์รายงานประจำปีสหกรณ์/กลุ่มเกษตรกรจากไฟล์ PDF ที่แนบมานี้อย่างละเอียดรอบคอบ 
 ปฏิบัติตามกฎเหล็กของนักวิชาการสหกรณ์ชำนาญการ กรมส่งเสริมสหกรณ์:
@@ -284,7 +285,7 @@ export async function POST(request: NextRequest) {
 
     let responseText: string | null = null;
 
-    // 1. Try modern Interactions API first (recommended by Google for gemini-3.8-flash)
+    // 1. Try modern Interactions API first with MINIMAL thinking to ensure fast completion under 60 seconds
     try {
       const interaction = await ai.interactions.create({
         model: modelName,
@@ -302,6 +303,7 @@ export async function POST(request: NextRequest) {
         system_instruction: systemInstruction,
         generation_config: {
           temperature: 0.1, // Strict temperature to prevent figure hallucination
+          thinking_level: "MINIMAL", // Prevents slow token generation to avoid Vercel 60s timeout
         },
         response_format: {
           type: "text",
@@ -333,6 +335,10 @@ export async function POST(request: NextRequest) {
           temperature: 0.1,
           responseMimeType: "application/json",
           responseSchema: cpsJsonSchema,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.MINIMAL,
+            thinkingBudget: 0,
+          },
         },
       });
 
