@@ -122,7 +122,20 @@ export default function CPSAnalyzerPage() {
         body: formData,
       });
 
-      const result = await response.json();
+      let result;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const errorText = await response.text();
+        if (response.status === 413 || errorText.includes("FUNCTION_PAYLOAD_TOO_LARGE") || errorText.includes("BODY_SIZE_LIMIT")) {
+          throw new Error("ไฟล์ PDF มีขนาดเกินกว่าที่ระบบคลาวด์ Vercel (Free Tier) รองรับ (จำกัด 4.5 MB) กรุณาแยกเฉพาะหน้าที่มีรายงานการประชุมและงบการเงิน หรือบีบอัดไฟล์ PDF แล้วลองใหม่อีกครั้ง");
+        }
+        if (response.status === 504 || errorText.includes("FUNCTION_INVOCATION_TIMEOUT")) {
+          throw new Error("การประมวลผลใช้เวลาเกิน 60 วินาที (Timeout บนคลาวด์ Vercel) กรุณาลองใหม่อีกครั้ง หรือใช้ไฟล์ที่มีจำนวนหน้าน้อยลง");
+        }
+        throw new Error(`เซิร์ฟเวอร์ตอบกลับ (${response.status}): ${errorText.slice(0, 300)}`);
+      }
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || "เกิดข้อผิดพลาดในการวิเคราะห์เอกสาร");
@@ -321,6 +334,17 @@ export default function CPSAnalyzerPage() {
                     <span className="inline-block mt-2 text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
                       คลิกเพื่อเปลี่ยนไฟล์
                     </span>
+                    {file.size > 4.5 * 1024 * 1024 && (
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-800 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                          <span>คำเตือน: ขนาดไฟล์เกิน 4.5 MB</span>
+                        </div>
+                        <p>
+                          บนคลาวด์ Vercel (Free Plan) จำกัดขนาดไฟล์ไม่เกิน 4.5 MB หากกดวิเคราะห์แล้วไม่ผ่าน แนะนำให้แยกเฉพาะหน้าที่มีรายงานการประชุมและงบการเงิน หรือบีบอัดไฟล์ PDF ก่อนอัปโหลด
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-1">

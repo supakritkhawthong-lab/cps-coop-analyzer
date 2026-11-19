@@ -5,7 +5,21 @@ import { GoogleGenAI } from "@google/genai";
 import { CPSAnalysisResult } from "@/types/cps";
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // 2 minutes for processing large PDFs
+export const maxDuration = 60; // 60 seconds is the maximum for Vercel Hobby plan
+
+const EMBEDDED_CPS_SYSTEM_PROMPT = `คุณคือ "นักวิชาการสหกรณ์ชำนาญการ กรมส่งเสริมสหกรณ์" ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลสหกรณ์และกลุ่มเกษตรกร เพื่อประกอบการจัดทำแผนส่งเสริมสหกรณ์ (CPS: Cooperative Performance Supervision)
+
+# กฎเหล็กในการทำงาน (Strict Rules)
+1. วิเคราะห์เฉพาะข้อมูลจากไฟล์ PDF ที่แนบมาในคำสั่งปัจจุบันเท่านั้น ห้ามคาดเดาหรือนำข้อมูลจากแหล่งอื่นมาปะปนโดยเด็ดขาด หากส่วนใดไม่มีข้อมูลในเอกสาร ให้ระบุว่า "ไม่ปรากฏข้อมูลในเอกสารรายงาน"
+2. ตรวจสอบความสอดคล้องของตัวเลข (Cross-Check) ระหว่าง "รายงานการประชุมใหญ่สามัญประจำปี" กับ "งบการเงินและรายงานของผู้สอบบัญชี (สำนักงานตรวจบัญชีสหกรณ์)" เสมอ หากพบตัวเลขขัดแย้งกัน เช่น ยอดจัดสรรกำไรไม่ตรงกัน หรือมีการกำหนดวงเงินกู้ยืม/ค้ำประกันต่ำกว่ายอดดำเนินธุรกิจจริง ให้ระบุเป็นประเด็นข้อสังเกตอย่างชัดเจนทันที
+3. ใช้ภาษาราชการที่กระชับ ตรงไปตรงมา ชัดเจน ไม่อ้อมค้อม อิงระเบียบนายทะเบียนสหกรณ์และพระราชบัญญัติสหกรณ์ พ.ศ. 2542 และที่แก้ไขเพิ่มเติม
+
+# โครงสร้างการวิเคราะห์ที่ต้องส่งออก (5 ส่วนหลักตาม JSON Schema)
+1. ด้านข้อมูลทั่วไปและตัวเลขสำคัญ (org_info)
+2. ด้านการบริหารจัดการองค์กร (management_4m)
+3. ด้านการบริหารจัดการธุรกิจ (business_analysis)
+4. ด้านการจัดสวัสดิการและสาธารณประโยชน์ (welfare_analysis)
+5. สรุปผลการวิเคราะห์และเป้าหมายการส่งเสริม CPS (cps_summary_and_audit)`;
 
 // Standard JSON Schema for CPS analysis structured output
 const cpsJsonSchema = {
@@ -252,8 +266,8 @@ export async function POST(request: NextRequest) {
     try {
       systemInstruction = await fs.readFile(promptPath, "utf-8");
     } catch (readErr) {
-      console.warn("Could not read prompt from file, falling back to default prompt:", readErr);
-      systemInstruction = `คุณคือ นักวิชาการสหกรณ์ชำนาญการ กรมส่งเสริมสหกรณ์ วิเคราะห์ข้อมูลจาก PDF ที่แนบมาอย่างเคร่งครัดตามหลัก 4M, การบริหารธุรกิจ, สวัสดิการ และจัดทำบทสรุป CPS`;
+      console.warn("Could not read prompt from file, falling back to embedded prompt:", readErr);
+      systemInstruction = EMBEDDED_CPS_SYSTEM_PROMPT;
     }
 
     // Initialize GoogleGenAI SDK client
