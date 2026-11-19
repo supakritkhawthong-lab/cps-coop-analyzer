@@ -337,7 +337,6 @@ export async function POST(request: NextRequest) {
           responseSchema: cpsJsonSchema,
           thinkingConfig: {
             thinkingLevel: ThinkingLevel.MINIMAL,
-            thinkingBudget: 0,
           },
         },
       });
