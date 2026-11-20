@@ -94,8 +94,18 @@ export interface PromotionGoalItem {
   target_kpi?: string;
 }
 
+export interface BoardPerformanceDetail {
+  overall_evaluation: string;
+  meeting_and_attendance: string;
+  agm_resolutions_drive: string;
+  management_and_business_control: string;
+  governance_and_compliance: string;
+  key_achievements: string[];
+  areas_for_improvement: string[];
+}
+
 export interface CPSSummaryAndAudit {
-  board_performance_summary: string;
+  board_performance_summary: string | BoardPerformanceDetail;
   promotion_goals_next_year: (string | PromotionGoalItem)[];
   strengths: string[];
   weaknesses: string[];

@@ -257,8 +257,62 @@ export async function generateCPSDocx(data: CPSAnalysisResult): Promise<Blob> {
 
           // Section 4: CPS Summary and Audit
           createSectionHeader("4. สรุปผลการวิเคราะห์และเป้าหมายการส่งเสริม (CPS)"),
-          createSubHeader("4.1 สรุปภาพรวมการปฏิบัติงานของคณะกรรมการ"),
-          new Paragraph({ text: cps_summary_and_audit.board_performance_summary, spacing: { after: 100 } }),
+          createSubHeader("4.1 สรุปภาพรวมการปฏิบัติงานของคณะกรรมการดำเนินการ (วิเคราะห์เชิงลึก)"),
+          ...(typeof cps_summary_and_audit.board_performance_summary === "string"
+            ? [new Paragraph({ text: cps_summary_and_audit.board_performance_summary, spacing: { after: 100 } })]
+            : [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "• ภาพรวมและผลการประเมิน: ", bold: true, color: "1E3A8A" }),
+                    new TextRun(cps_summary_and_audit.board_performance_summary.overall_evaluation || "-"),
+                  ],
+                  spacing: { after: 80 },
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "• สถิติการประชุมและการมีส่วนร่วม: ", bold: true, color: "1E3A8A" }),
+                    new TextRun(cps_summary_and_audit.board_performance_summary.meeting_and_attendance || "-"),
+                  ],
+                  spacing: { after: 80 },
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "• การขับเคลื่อนมติที่ประชุมใหญ่ (สำเร็จ vs คั่งค้าง): ", bold: true, color: "1E3A8A" }),
+                    new TextRun(cps_summary_and_audit.board_performance_summary.agm_resolutions_drive || "-"),
+                  ],
+                  spacing: { after: 80 },
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "• การกำกับดูแลฝ่ายจัดการและธุรกิจ: ", bold: true, color: "1E3A8A" }),
+                    new TextRun(cps_summary_and_audit.board_performance_summary.management_and_business_control || "-"),
+                  ],
+                  spacing: { after: 80 },
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: "• ธรรมาภิบาลและการแก้ไขข้อบกพร่อง: ", bold: true, color: "1E3A8A" }),
+                    new TextRun(cps_summary_and_audit.board_performance_summary.governance_and_compliance || "-"),
+                  ],
+                  spacing: { after: 100 },
+                }),
+                new Paragraph({
+                  text: "ผลงานสำคัญที่คณะกรรมการผลักดันสำเร็จ:",
+                  heading: HeadingLevel.HEADING_4,
+                  spacing: { before: 80, after: 60 },
+                }),
+                ...(cps_summary_and_audit.board_performance_summary.key_achievements?.map((ach) =>
+                  createSimpleBullet(ach)
+                ) || []),
+                new Paragraph({
+                  text: "จุดอ่อน/ข้อบกพร่องที่คณะกรรมการต้องเร่งแก้ไข:",
+                  heading: HeadingLevel.HEADING_4,
+                  spacing: { before: 80, after: 60 },
+                }),
+                ...(cps_summary_and_audit.board_performance_summary.areas_for_improvement?.map((imp) =>
+                  createSimpleBullet(imp)
+                ) || []),
+              ]),
 
           createSubHeader("4.2 จุดเด่นของสหกรณ์"),
           ...cps_summary_and_audit.strengths.map((s) => createSimpleBullet(s)),

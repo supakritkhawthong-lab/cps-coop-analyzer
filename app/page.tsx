@@ -21,6 +21,9 @@ import {
   AlertCircle,
   HelpCircle,
   Award,
+  Calendar,
+  Scale,
+  Target,
 } from "lucide-react";
 import { CPSAnalysisResult } from "@/types/cps";
 import { generateCPSDocx } from "@/lib/docx-export";
@@ -1008,15 +1011,120 @@ export default function CPSAnalyzerPage() {
                   </div>
                 </div>
 
-                {/* Board Performance Summary */}
-                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-2">
-                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-900" />
-                    สรุปภาพรวมการปฏิบัติงานของคณะกรรมการดำเนินการ
-                  </h4>
-                  <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    {analysisResult.cps_summary_and_audit.board_performance_summary}
-                  </p>
+                {/* Board Performance Summary (In-Depth Analysis) */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                    <h4 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                      <Users className="w-5 h-5 text-blue-900" />
+                      การวิเคราะห์และสรุปผลการปฏิบัติงานของคณะกรรมการดำเนินการ
+                    </h4>
+                    <span className="text-xs text-blue-900 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full font-semibold">
+                      การประเมินเชิงลึกตามรายงานประจำปี
+                    </span>
+                  </div>
+
+                  {typeof analysisResult.cps_summary_and_audit.board_performance_summary === "string" ? (
+                    <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 whitespace-pre-wrap">
+                      {analysisResult.cps_summary_and_audit.board_performance_summary}
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* 1. ภาพรวมและผลการประเมินการปฏิบัติหน้าที่ */}
+                      {analysisResult.cps_summary_and_audit.board_performance_summary.overall_evaluation && (
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <Award className="w-4 h-4 text-blue-800" />
+                            สรุปภาพรวมและผลการประเมินการปฏิบัติหน้าที่
+                          </p>
+                          <p className="text-sm text-slate-800 leading-relaxed font-medium">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.overall_evaluation}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 2. Grid 4 มิติการกำกับดูแล */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {/* 2.1 สถิติการประชุมและการมีส่วนร่วม */}
+                        <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100/80 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-blue-950">
+                            <Calendar className="w-4 h-4 text-blue-700" />
+                            <span>สถิติการประชุมและการมีส่วนร่วม</span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.meeting_and_attendance || "-"}
+                          </p>
+                        </div>
+
+                        {/* 2.2 การขับเคลื่อนมติที่ประชุมใหญ่ */}
+                        <div className="bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/80 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                            <Target className="w-4 h-4 text-indigo-700" />
+                            <span>การขับเคลื่อนมติที่ประชุมใหญ่ (สำเร็จ vs คั่งค้าง)</span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.agm_resolutions_drive || "-"}
+                          </p>
+                        </div>
+
+                        {/* 2.3 การกำกับดูแลฝ่ายจัดการและธุรกิจ */}
+                        <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100/80 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950">
+                            <Briefcase className="w-4 h-4 text-emerald-700" />
+                            <span>การกำกับดูแลฝ่ายจัดการและธุรกิจ</span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.management_and_business_control || "-"}
+                          </p>
+                        </div>
+
+                        {/* 2.4 ธรรมาภิบาลและการปฏิบัติตามกฎหมาย */}
+                        <div className="bg-amber-50/40 p-4 rounded-xl border border-amber-100/80 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                            <Scale className="w-4 h-4 text-amber-700" />
+                            <span>ธรรมาภิบาลและการแก้ไขข้อบกพร่อง</span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.governance_and_compliance || "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 3. สองคอลัมน์: ผลงานสำคัญ vs จุดอ่อนที่ต้องปรับปรุง */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        {/* ผลงานเด่น */}
+                        <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 pb-1.5 border-b border-emerald-200/50">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>ผลงานสำคัญที่คณะกรรมการผลักดันสำเร็จ</span>
+                          </div>
+                          <ul className="space-y-1.5 text-xs text-slate-700">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.key_achievements?.map((ach, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-emerald-600 font-bold mt-0.5">•</span>
+                                <span className="leading-relaxed">{ach}</span>
+                              </li>
+                            )) || <li className="text-slate-400">ไม่ปรากฏข้อมูลผลงานเด่นที่ระบุชัดเจน</li>}
+                          </ul>
+                        </div>
+
+                        {/* ประเด็นที่ต้องปรับปรุง */}
+                        <div className="bg-rose-50/60 p-4 rounded-xl border border-rose-200/70 space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900 pb-1.5 border-b border-rose-200/50">
+                            <AlertCircle className="w-4 h-4 text-rose-600" />
+                            <span>จุดอ่อน/ประเด็นที่คณะกรรมการต้องเร่งแก้ไข</span>
+                          </div>
+                          <ul className="space-y-1.5 text-xs text-slate-700">
+                            {analysisResult.cps_summary_and_audit.board_performance_summary.areas_for_improvement?.map((imp, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-rose-600 font-bold mt-0.5">•</span>
+                                <span className="leading-relaxed">{imp}</span>
+                              </li>
+                            )) || <li className="text-slate-400">ไม่ปรากฏข้อมูลจุดบกพร่องที่ระบุชัดเจน</li>}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Auditor Observations */}
