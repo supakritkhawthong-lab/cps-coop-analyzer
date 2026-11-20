@@ -130,13 +130,13 @@ export default function CPSAnalyzerPage() {
         result = await response.json();
       } else {
         const errorText = await response.text();
-        if (response.status === 413 || errorText.includes("FUNCTION_PAYLOAD_TOO_LARGE") || errorText.includes("BODY_SIZE_LIMIT")) {
-          throw new Error("ไฟล์ PDF มีขนาดเกินกว่าที่ระบบคลาวด์ Vercel (Free Tier) รองรับ (จำกัด 4.5 MB) กรุณาแยกเฉพาะหน้าที่มีรายงานการประชุมและงบการเงิน หรือบีบอัดไฟล์ PDF แล้วลองใหม่อีกครั้ง");
+        if (response.status === 413 || errorText.includes("PAYLOAD_TOO_LARGE") || errorText.includes("BODY_SIZE")) {
+          throw new Error("ไฟล์ PDF มีขนาดใหญ่เกินกว่าที่ระบบรับได้ในครั้งเดียว กรุณาแยกเฉพาะหน้าที่มีรายงานการประชุมและงบการเงิน หรือบีบอัดไฟล์ PDF (แนะนำไม่เกิน 20 MB)");
         }
-        if (response.status === 504 || errorText.includes("FUNCTION_INVOCATION_TIMEOUT")) {
-          throw new Error("การประมวลผลใช้เวลาเกิน 60 วินาที (Timeout บนคลาวด์ Vercel) กรุณาลองใหม่อีกครั้ง หรือใช้ไฟล์ที่มีจำนวนหน้าน้อยลง");
+        if (response.status === 502 || response.status === 504 || errorText.includes("Bad Gateway") || errorText.includes("Gateway Timeout")) {
+          throw new Error("เซิร์ฟเวอร์ตอบกลับ 502/504 (Timeout หรือหน่วยความจำเต็ม): ไฟล์มีขนาดใหญ่มากหรือใช้เวลาวิเคราะห์เกิน 100 วินาที แนะนำให้: 1) สลับมาใช้ '⚡ โหมดประมวลผลเร็ว' หรือ 2) แยกเฉพาะหน้าสำคัญที่มีรายงานการประชุมและงบการเงิน (ขนาดแนะนำไม่เกิน 15-20 MB)");
         }
-        throw new Error(`เซิร์ฟเวอร์ตอบกลับ (${response.status}): ${errorText.slice(0, 300)}`);
+        throw new Error(`เซิร์ฟเวอร์ตอบกลับ (${response.status}): ${errorText.slice(0, 300) || "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"}`);
       }
 
       if (!response.ok || !result.success) {
@@ -336,14 +336,14 @@ export default function CPSAnalyzerPage() {
                     <span className="inline-block mt-2 text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
                       คลิกเพื่อเปลี่ยนไฟล์
                     </span>
-                    {file.size > 4.5 * 1024 * 1024 && (
+                    {file.size > 20 * 1024 * 1024 && (
                       <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-800 space-y-1">
                         <div className="flex items-center gap-1.5 font-bold text-amber-900">
                           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                          <span>คำเตือน: ขนาดไฟล์เกิน 4.5 MB</span>
+                          <span>คำเตือน: ขนาดไฟล์เกิน 20 MB ({(file.size / (1024 * 1024)).toFixed(1)} MB)</span>
                         </div>
                         <p>
-                          บนคลาวด์ Vercel (Free Plan) จำกัดขนาดไฟล์ไม่เกิน 4.5 MB หากกดวิเคราะห์แล้วไม่ผ่าน แนะนำให้แยกเฉพาะหน้าที่มีรายงานการประชุมและงบการเงิน หรือบีบอัดไฟล์ PDF ก่อนอัปโหลด
+                          Google Gemini API รองรับไฟล์ส่งตรง (Inline Data) สูงสุดไม่เกิน 20 MB หากไฟล์มีขนาดใหญ่มาก แนะนำให้ใช้เครื่องมือบีบอัดไฟล์ (Compress PDF) หรือแยกเฉพาะหน้าสำคัญที่มีรายงานการประชุมและงบการเงิน
                         </p>
                       </div>
                     )}
@@ -357,7 +357,7 @@ export default function CPSAnalyzerPage() {
                       หรือ <span className="text-blue-700 font-medium underline">คลิกเพื่อเลือกไฟล์</span> จากคอมพิวเตอร์ของคุณ
                     </p>
                     <p className="text-[11px] text-slate-400 pt-2">
-                      รองรับไฟล์ PDF เอกสารสแกนหรือดิจิทัล (ขนาดแนะนำไม่เกิน 50 MB)
+                      รองรับไฟล์ PDF เอกสารสแกนหรือดิจิทัล (ขนาดแนะนำไม่เกิน 15 – 20 MB)
                     </p>
                   </div>
                 )}

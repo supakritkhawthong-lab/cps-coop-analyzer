@@ -249,6 +249,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Google Gemini API inlineData limit is approx 20MB. Checking here prevents Node.js OOM crashes (502 Bad Gateway).
+    const MAX_INLINE_BYTES = 25 * 1024 * 1024;
+    if (file.size > MAX_INLINE_BYTES) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `ไฟล์ PDF มีขนาด ${(file.size / (1024 * 1024)).toFixed(1)} MB ซึ่งเกินขีดจำกัด 20 MB ของ Google Gemini API สำหรับการประมวลผลแบบ Inline Data แนะนำให้บีบอัดไฟล์ PDF หรือแยกเฉพาะหน้าสำคัญ (เช่น หน้าที่มีรายงานการประชุมใหญ่และงบการเงิน/รายงานผู้สอบบัญชี)`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Read PDF bytes and convert directly to Base64 (NO pdf-parse or third-party text extractors used)
     const arrayBuffer = await file.arrayBuffer();
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
