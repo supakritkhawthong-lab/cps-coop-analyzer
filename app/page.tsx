@@ -248,12 +248,23 @@ export default function CPSAnalyzerPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Error Banner */}
         {errorMessage && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-start gap-3 shadow-sm animate-fade-in">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 text-sm">
-              <p className="font-semibold text-red-900">เกิดข้อผิดพลาด</p>
-              <p className="mt-0.5">{errorMessage}</p>
+          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-fade-in">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 text-sm">
+                <p className="font-semibold text-red-900">เกิดข้อผิดพลาด</p>
+                <p className="mt-0.5 leading-relaxed">{errorMessage}</p>
+              </div>
             </div>
+            {file && (
+              <button
+                onClick={handleStartAnalysis}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs flex-shrink-0 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                ลองใหม่อีกครั้ง
+              </button>
+            )}
           </div>
         )}
 

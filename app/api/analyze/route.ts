@@ -246,6 +246,84 @@ const cpsJsonSchema = {
   ],
 };
 
+// Resilient generator that handles temporary spikes (503/429) via exponential backoff and model failover
+async function generateWithRetryAndFallback(
+  ai: GoogleGenAI,
+  primaryModel: string,
+  fileUri: string,
+  userPrompt: string,
+  systemInstruction: string,
+  responseSchema: unknown
+): Promise<{ text: string; usedModel: string }> {
+  // Candidate models: prioritize the chosen model, but fall back to the sibling model if overwhelmed
+  const candidateModels =
+    primaryModel === "gemini-3.5-flash-lite"
+      ? ["gemini-3.5-flash-lite", "gemini-3.8-flash"]
+      : ["gemini-3.8-flash", "gemini-3.5-flash-lite"];
+
+  let lastError: unknown = null;
+
+  for (const model of candidateModels) {
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[CPS Analyzer] Requesting Gemini with model ${model} (attempt ${attempt}/${maxAttempts})...`);
+
+        // Use generateContent with uploaded Google File URI and structured JSON schema
+        const generateResponse = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              fileData: {
+                fileUri,
+                mimeType: "application/pdf",
+              },
+            },
+            {
+              text: userPrompt,
+            },
+          ],
+          config: {
+            systemInstruction,
+            temperature: 0.1,
+            responseMimeType: "application/json",
+            responseSchema,
+          },
+        });
+
+        if (generateResponse.text) {
+          return { text: generateResponse.text, usedModel: model };
+        }
+      } catch (err: unknown) {
+        lastError = err;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const isTransient =
+          errMsg.includes("503") ||
+          errMsg.includes("UNAVAILABLE") ||
+          errMsg.includes("high demand") ||
+          errMsg.includes("429") ||
+          errMsg.includes("RESOURCE_EXHAUSTED");
+
+        console.warn(`[CPS Analyzer] Model ${model} attempt ${attempt} failed: ${errMsg}`);
+
+        if (isTransient && attempt < maxAttempts) {
+          // Wait 2.5 seconds before retrying the same model
+          console.log(`[CPS Analyzer] Temporary overload detected. Retrying ${model} in 2.5 seconds...`);
+          await new Promise((r) => setTimeout(r, 2500));
+        } else if (isTransient) {
+          console.warn(`[CPS Analyzer] Model ${model} unavailable after ${maxAttempts} attempts. Failing over to ${candidateModels[1]}...`);
+          break; // break to next candidate model
+        } else {
+          // Non-transient error, break immediately
+          break;
+        }
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -342,60 +420,18 @@ export async function POST(request: NextRequest) {
 2. ตรวจสอบ Cross-Check ความสอดคล้องของตัวเลขระหว่างรายงานการประชุมใหญ่กับงบการเงินและรายงานผู้สอบบัญชีอย่างเคร่งครัด
 3. นำเสนอผลการวิเคราะห์ตามโครงสร้าง Structured JSON Schema ครบทั้ง 5 ด้าน: org_info, management_4m, business_analysis, welfare_analysis, cps_summary_and_audit`;
 
-      // 1. Try modern Interactions API first with uploaded Google File URI
-      try {
-        const interaction = await ai.interactions.create({
-          model: modelName,
-          input: [
-            {
-              type: "document",
-              uri: uploadedFile.uri,
-              mime_type: "application/pdf",
-            },
-            {
-              type: "text",
-              text: userPrompt,
-            },
-          ],
-          system_instruction: systemInstruction,
-          generation_config: {
-            temperature: 0.1, // Strict temperature to prevent figure hallucination
-          },
-          response_format: {
-            type: "text",
-            mime_type: "application/json",
-            schema: cpsJsonSchema,
-          },
-        });
+      // Generate CPS analysis with automatic retry & model failover
+      const { text: resultText, usedModel } = await generateWithRetryAndFallback(
+        ai,
+        modelName,
+        uploadedFile.uri,
+        userPrompt,
+        systemInstruction,
+        cpsJsonSchema
+      );
 
-        responseText = interaction.output_text ?? null;
-      } catch (interactionErr: unknown) {
-        console.warn("Interactions API call failed, attempting fallback to models.generateContent:", interactionErr);
-
-        // 2. Fallback to models.generateContent with uploaded Google File URI
-        const generateResponse = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            {
-              fileData: {
-                fileUri: uploadedFile.uri,
-                mimeType: "application/pdf",
-              },
-            },
-            {
-              text: userPrompt,
-            },
-          ],
-          config: {
-            systemInstruction,
-            temperature: 0.1,
-            responseMimeType: "application/json",
-            responseSchema: cpsJsonSchema,
-          },
-        });
-
-        responseText = generateResponse.text ?? null;
-      }
+      console.log(`[CPS Analyzer] Successfully generated analysis using ${usedModel}`);
+      responseText = resultText;
     } finally {
       // 1. Always delete temporary file from local disk
       await fs.unlink(tempFilePath).catch(() => {});
@@ -429,11 +465,41 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("CPS Analysis Error:", err);
-    const message = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการวิเคราะห์เอกสาร";
+    let friendlyMessage = err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการวิเคราะห์เอกสาร";
+
+    // Attempt to extract the clean message if Google returned a raw JSON error string
+    try {
+      if (friendlyMessage.includes('{"error":')) {
+        const jsonStart = friendlyMessage.indexOf('{"error":');
+        const jsonSub = friendlyMessage.slice(jsonStart);
+        const parsedErr = JSON.parse(jsonSub);
+        if (parsedErr?.error?.message) {
+          friendlyMessage = parsedErr.error.message;
+        }
+      }
+    } catch {}
+
+    // Map common Google Gemini error codes to clear, actionable Thai explanations
+    if (
+      friendlyMessage.includes("503") ||
+      friendlyMessage.includes("UNAVAILABLE") ||
+      friendlyMessage.includes("high demand")
+    ) {
+      friendlyMessage =
+        "เซิร์ฟเวอร์ Google Gemini กำลังมีผู้ใช้งานหนาแน่นชั่วคราว (503 Service Unavailable / High Demand) ระบบได้พยายามเชื่อมต่อใหม่อัตโนมัติแล้ว กรุณารอสักครู่ (ประมาณ 10–20 วินาที) แล้วกด 'ลองใหม่อีกครั้ง' หรือสลับโหมดการประมวลผล";
+    } else if (
+      friendlyMessage.includes("429") ||
+      friendlyMessage.includes("RESOURCE_EXHAUSTED") ||
+      friendlyMessage.includes("quota")
+    ) {
+      friendlyMessage =
+        "คำขอใช้งานเกินขีดจำกัดโควตาชั่วคราว (429 Rate Limit) กรุณารอสักครู่แล้วกดลองใหม่อีกครั้ง";
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: `การวิเคราะห์ล้มเหลว: ${message}`,
+        error: `การวิเคราะห์ล้มเหลว: ${friendlyMessage}`,
       },
       { status: 500 }
     );
