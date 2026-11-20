@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import os from "node:os";
+import crypto from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import { CPSAnalysisResult } from "@/types/cps";
 
@@ -249,28 +251,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Google Gemini API inlineData limit is approx 20MB. Checking here prevents Node.js OOM crashes (502 Bad Gateway).
-    const MAX_INLINE_BYTES = 25 * 1024 * 1024;
-    if (file.size > MAX_INLINE_BYTES) {
+    // Support files up to 100MB using Google Files API (which supports up to 2GB)
+    const MAX_FILE_BYTES = 100 * 1024 * 1024;
+    if (file.size > MAX_FILE_BYTES) {
       return NextResponse.json(
         {
           success: false,
-          error: `ไฟล์ PDF มีขนาด ${(file.size / (1024 * 1024)).toFixed(1)} MB ซึ่งเกินขีดจำกัด 20 MB ของ Google Gemini API สำหรับการประมวลผลแบบ Inline Data แนะนำให้บีบอัดไฟล์ PDF หรือแยกเฉพาะหน้าสำคัญ (เช่น หน้าที่มีรายงานการประชุมใหญ่และงบการเงิน/รายงานผู้สอบบัญชี)`,
+          error: `ไฟล์ PDF มีขนาด ${(file.size / (1024 * 1024)).toFixed(1)} MB ซึ่งเกินขีดจำกัดสูงสุด 100 MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 100 MB`,
         },
         { status: 400 }
       );
     }
 
-    // Read PDF bytes and convert directly to Base64 (NO pdf-parse or third-party text extractors used)
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString("base64");
-
-    if (!base64Data || base64Data.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "ไฟล์ PDF มีขนาด 0 ไบต์ หรือไม่สามารถอ่านข้อมูลได้" },
-        { status: 400 }
-      );
-    }
+    // Initialize GoogleGenAI SDK client
+    const ai = new GoogleGenAI({ apiKey });
 
     // Read System Instruction from prompts/cps_system_prompt.md
     const promptPath = path.join(process.cwd(), "prompts", "cps_system_prompt.md");
@@ -282,74 +276,109 @@ export async function POST(request: NextRequest) {
       systemInstruction = EMBEDDED_CPS_SYSTEM_PROMPT;
     }
 
-    // Initialize GoogleGenAI SDK client
-    const ai = new GoogleGenAI({ apiKey });
+    // Save uploaded file stream to a temporary file on disk to prevent Node.js memory spike (OOM crash)
+    const tempFileName = `cps-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`;
+    const tempFilePath = path.join(os.tmpdir(), tempFileName);
+    const arrayBuffer = await file.arrayBuffer();
+    await fs.writeFile(tempFilePath, Buffer.from(arrayBuffer));
 
-    // Use gemini-3.5-flash-lite as the fast default for Vercel Serverless (avoids 60s timeout), or gemini-3.8-flash if requested
-    const requestedModel = formData.get("model") as string | null;
-    const modelName = requestedModel || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+    // Upload to Google Gemini Files API (supports up to 2GB per file)
+    let uploadedFile: any = null;
+    let responseText: string | null = null;
 
-    const userPrompt = `โปรดวิเคราะห์รายงานประจำปีสหกรณ์/กลุ่มเกษตรกรจากไฟล์ PDF ที่แนบมานี้อย่างละเอียดรอบคอบ 
+    try {
+      uploadedFile = await ai.files.upload({
+        file: tempFilePath,
+        config: {
+          mimeType: "application/pdf",
+          displayName: file.name,
+        },
+      });
+
+      // Poll until file state is ACTIVE (usually instant for PDFs)
+      let attempts = 0;
+      while (uploadedFile.state === "PROCESSING" && attempts < 15) {
+        await new Promise((r) => setTimeout(r, 1000));
+        uploadedFile = await ai.files.get({ name: uploadedFile.name });
+        attempts++;
+      }
+
+      if (uploadedFile.state === "FAILED") {
+        throw new Error("Google Files API ประมวลผลไฟล์ไม่สำเร็จ");
+      }
+
+      // Use gemini-3.5-flash-lite as the fast default, or gemini-3.8-flash if requested
+      const requestedModel = formData.get("model") as string | null;
+      const modelName = requestedModel || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+
+      const userPrompt = `โปรดวิเคราะห์รายงานประจำปีสหกรณ์/กลุ่มเกษตรกรจากไฟล์ PDF ที่แนบมานี้อย่างละเอียดรอบคอบ 
 ปฏิบัติตามกฎเหล็กของนักวิชาการสหกรณ์ชำนาญการ กรมส่งเสริมสหกรณ์:
 1. วิเคราะห์เฉพาะข้อเท็จจริงใน PDF ห้ามคาดเดา
 2. ตรวจสอบ Cross-Check ความสอดคล้องของตัวเลขระหว่างรายงานการประชุมใหญ่กับงบการเงินและรายงานผู้สอบบัญชีอย่างเคร่งครัด
 3. นำเสนอผลการวิเคราะห์ตามโครงสร้าง Structured JSON Schema ครบทั้ง 5 ด้าน: org_info, management_4m, business_analysis, welfare_analysis, cps_summary_and_audit`;
 
-    let responseText: string | null = null;
-
-    // 1. Try modern Interactions API first with MINIMAL thinking to ensure fast completion under 60 seconds
-    try {
-      const interaction = await ai.interactions.create({
-        model: modelName,
-        input: [
-          {
-            type: "document",
-            data: base64Data,
-            mime_type: "application/pdf",
-          },
-          {
-            type: "text",
-            text: userPrompt,
-          },
-        ],
-        system_instruction: systemInstruction,
-        generation_config: {
-          temperature: 0.1, // Strict temperature to prevent figure hallucination
-        },
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: cpsJsonSchema,
-        },
-      });
-
-      responseText = interaction.output_text ?? null;
-    } catch (interactionErr: unknown) {
-      console.warn("Interactions API call failed, attempting fallback to models.generateContent:", interactionErr);
-
-      // 2. Fallback to models.generateContent if Interactions API encounters issues
-      const generateResponse = await ai.models.generateContent({
-        model: modelName,
-        contents: [
-          {
-            inlineData: {
-              mimeType: "application/pdf",
-              data: base64Data,
+      // 1. Try modern Interactions API first with uploaded Google File URI
+      try {
+        const interaction = await ai.interactions.create({
+          model: modelName,
+          input: [
+            {
+              type: "document",
+              uri: uploadedFile.uri,
+              mime_type: "application/pdf",
             },
+            {
+              type: "text",
+              text: userPrompt,
+            },
+          ],
+          system_instruction: systemInstruction,
+          generation_config: {
+            temperature: 0.1, // Strict temperature to prevent figure hallucination
           },
-          {
-            text: userPrompt,
+          response_format: {
+            type: "text",
+            mime_type: "application/json",
+            schema: cpsJsonSchema,
           },
-        ],
-        config: {
-          systemInstruction,
-          temperature: 0.1,
-          responseMimeType: "application/json",
-          responseSchema: cpsJsonSchema,
-        },
-      });
+        });
 
-      responseText = generateResponse.text ?? null;
+        responseText = interaction.output_text ?? null;
+      } catch (interactionErr: unknown) {
+        console.warn("Interactions API call failed, attempting fallback to models.generateContent:", interactionErr);
+
+        // 2. Fallback to models.generateContent with uploaded Google File URI
+        const generateResponse = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              fileData: {
+                fileUri: uploadedFile.uri,
+                mimeType: "application/pdf",
+              },
+            },
+            {
+              text: userPrompt,
+            },
+          ],
+          config: {
+            systemInstruction,
+            temperature: 0.1,
+            responseMimeType: "application/json",
+            responseSchema: cpsJsonSchema,
+          },
+        });
+
+        responseText = generateResponse.text ?? null;
+      }
+    } finally {
+      // 1. Always delete temporary file from local disk
+      await fs.unlink(tempFilePath).catch(() => {});
+
+      // 2. Always delete remote file from Google Files API storage to keep storage clean
+      if (uploadedFile?.name) {
+        await ai.files.delete({ name: uploadedFile.name }).catch(() => {});
+      }
     }
 
     if (!responseText) {

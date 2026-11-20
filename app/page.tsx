@@ -42,7 +42,7 @@ export default function CPSAnalyzerPage() {
 
   const loadingSteps = [
     "กำลังอ่านไฟล์ PDF เข้าสู่ระบบ...",
-    "ส่งไฟล์เอกสารเข้าสู่โมเดล Gemini แบบ Inline Vision Data...",
+    "อัปโหลดไฟล์ขึ้นสู่ Google Files API Storage ความเร็วสูง...",
     "วิเคราะห์โครงสร้างงบการเงินและรายงานการประชุมใหญ่...",
     "ตรวจทานความสอดคล้องตัวเลข (Cross-Check) และสกัดข้อมูลตามหลัก 4M...",
     "รวบรวมข้อสังเกตของผู้สอบบัญชีและสังเคราะห์แผนส่งเสริม CPS...",
@@ -336,14 +336,14 @@ export default function CPSAnalyzerPage() {
                     <span className="inline-block mt-2 text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
                       คลิกเพื่อเปลี่ยนไฟล์
                     </span>
-                    {file.size > 20 * 1024 * 1024 && (
-                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-800 space-y-1">
-                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                          <span>คำเตือน: ขนาดไฟล์เกิน 20 MB ({(file.size / (1024 * 1024)).toFixed(1)} MB)</span>
+                    {file.size > 50 * 1024 * 1024 && (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-left text-xs text-blue-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-blue-950">
+                          <CheckCircle2 className="w-4 h-4 text-blue-700 flex-shrink-0" />
+                          <span>รองรับไฟล์ขนาดใหญ่ ({(file.size / (1024 * 1024)).toFixed(1)} MB) ผ่าน Google Files API</span>
                         </div>
                         <p>
-                          Google Gemini API รองรับไฟล์ส่งตรง (Inline Data) สูงสุดไม่เกิน 20 MB หากไฟล์มีขนาดใหญ่มาก แนะนำให้ใช้เครื่องมือบีบอัดไฟล์ (Compress PDF) หรือแยกเฉพาะหน้าสำคัญที่มีรายงานการประชุมและงบการเงิน
+                          ระบบจะส่งไฟล์ผ่าน Google Files Storage อัตโนมัติ สำหรับไฟล์ขนาดใหญ่ แนะนำให้เลือก "⚡ โหมดประมวลผลเร็ว" เพื่อให้ได้ผลลัพธ์ที่รวดเร็วที่สุด
                         </p>
                       </div>
                     )}
@@ -357,7 +357,7 @@ export default function CPSAnalyzerPage() {
                       หรือ <span className="text-blue-700 font-medium underline">คลิกเพื่อเลือกไฟล์</span> จากคอมพิวเตอร์ของคุณ
                     </p>
                     <p className="text-[11px] text-slate-400 pt-2">
-                      รองรับไฟล์ PDF เอกสารสแกนหรือดิจิทัล (ขนาดแนะนำไม่เกิน 15 – 20 MB)
+                      รองรับไฟล์ PDF เอกสารสแกนหรือดิจิทัล (รองรับสูงสุด 50–100 MB ด้วย Google Files API)
                     </p>
                   </div>
                 )}
