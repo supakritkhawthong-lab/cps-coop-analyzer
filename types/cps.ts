@@ -7,6 +7,7 @@ export interface FinancialRatio {
 export interface OrgInfo {
   coop_name: string;
   coop_type: string;
+  cooperative_strength_class?: string; // เช่น ชั้น 1 (เข้มแข็งมาก), ชั้น 2 (เข้มแข็งปานกลาง), ชั้น 3 (ต้องปรับปรุง)
   fiscal_year_end: string;
   operating_capital: string;
   net_profit: string;
@@ -80,12 +81,25 @@ export interface WelfareAnalysis {
   actual_usage_summary: string;
 }
 
+export interface AuditorObservationItem {
+  severity: "CRITICAL" | "WARNING" | "ADVISORY" | string;
+  issue: string;
+  impact?: string;
+  recommendation?: string;
+}
+
+export interface PromotionGoalItem {
+  goal: string;
+  action_plan: string;
+  target_kpi?: string;
+}
+
 export interface CPSSummaryAndAudit {
   board_performance_summary: string;
-  promotion_goals_next_year: string[];
+  promotion_goals_next_year: (string | PromotionGoalItem)[];
   strengths: string[];
   weaknesses: string[];
-  auditor_observations: string[];
+  auditor_observations: (string | AuditorObservationItem)[];
   cps_full_summary_text: string;
 }
 

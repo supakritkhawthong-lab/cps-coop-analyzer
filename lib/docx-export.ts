@@ -194,6 +194,12 @@ export async function generateCPSDocx(data: CPSAnalysisResult): Promise<Blob> {
             children: [
               new TextRun({ text: "ประจำปีบัญชีสิ้นสุด: ", bold: true }),
               new TextRun(org_info.fiscal_year_end),
+              ...(org_info.cooperative_strength_class
+                ? [
+                    new TextRun({ text: "  |  ชั้นความเข้มแข็ง: ", bold: true, color: "1E3A8A" }),
+                    new TextRun({ text: org_info.cooperative_strength_class, bold: true }),
+                  ]
+                : []),
             ],
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
@@ -260,11 +266,29 @@ export async function generateCPSDocx(data: CPSAnalysisResult): Promise<Blob> {
           createSubHeader("4.3 จุดอ่อนและประเด็นที่ต้องปรับปรุง"),
           ...cps_summary_and_audit.weaknesses.map((w) => createSimpleBullet(w)),
 
-          createSubHeader("4.4 เป้าหมายในการส่งเสริมปีงบประมาณถัดไป (CPS Goals)"),
-          ...cps_summary_and_audit.promotion_goals_next_year.map((g) => createSimpleBullet(g)),
+          createSubHeader("4.4 เป้าหมายและแผนปฏิบัติการส่งเสริมปีงบประมาณถัดไป (CPS Goals & Action Plan)"),
+          ...cps_summary_and_audit.promotion_goals_next_year.map((g) => {
+            if (typeof g === "string") return createSimpleBullet(g);
+            return createBullet(
+              g.goal,
+              `มาตรการส่งเสริม: ${g.action_plan}${g.target_kpi ? ` | ตัวชี้วัด/กรอบเวลา: ${g.target_kpi}` : ""}`
+            );
+          }),
 
-          createSubHeader("4.5 ข้อสังเกตและข้อเสนอแนะของผู้สอบบัญชี (สำนักงานตรวจบัญชีสหกรณ์)"),
-          ...cps_summary_and_audit.auditor_observations.map((obs) => createSimpleBullet(obs)),
+          createSubHeader("4.5 ข้อสังเกตและข้อเสนอแนะของผู้สอบบัญชี (จำแนกตามระดับความเสี่ยง)"),
+          ...cps_summary_and_audit.auditor_observations.map((obs) => {
+            if (typeof obs === "string") return createSimpleBullet(obs);
+            const severityLabel =
+              obs.severity === "CRITICAL"
+                ? "[วิกฤต/ข้อบกพร่องตามกฎหมาย]"
+                : obs.severity === "WARNING"
+                ? "[เตือนภัย/ความเสี่ยงสูง]"
+                : "[ข้อเสนอแนะเชิงพัฒนา]";
+            return createBullet(
+              `${severityLabel} ${obs.issue}`,
+              `${obs.impact ? `ผลกระทบ: ${obs.impact} | ` : ""}แนวทางแก้ไข: ${obs.recommendation || "-"}`
+            );
+          }),
 
           createSubHeader("4.6 บทสรุป CPS ฉบับสมบูรณ์ (สำหรับคัดลอกลงระบบ CPS)"),
           new Paragraph({

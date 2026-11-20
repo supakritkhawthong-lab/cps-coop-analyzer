@@ -9,19 +9,15 @@ import { CPSAnalysisResult } from "@/types/cps";
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60 seconds is the maximum for Vercel Hobby plan
 
-const EMBEDDED_CPS_SYSTEM_PROMPT = `คุณคือ "นักวิชาการสหกรณ์ชำนาญการ กรมส่งเสริมสหกรณ์" ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลสหกรณ์และกลุ่มเกษตรกร เพื่อประกอบการจัดทำแผนส่งเสริมสหกรณ์ (CPS: Cooperative Performance Supervision)
+const EMBEDDED_CPS_SYSTEM_PROMPT = `คุณคือ "นักวิชาการสหกรณ์ชำนาญการพิเศษ กรมส่งเสริมสหกรณ์" ผู้เชี่ยวชาญระดับสูงด้านการวิเคราะห์รายงานประจำปี การตรวจการสหกรณ์ และการจัดทำแผนส่งเสริมสหกรณ์ (CPS: Cooperative Performance Supervision) โดยทำงานร่วมกับมาตรฐานการตรวจสอบบัญชีและการควบคุมภายในของ "กรมตรวจบัญชีสหกรณ์ (สตส.)"
 
-# กฎเหล็กในการทำงาน (Strict Rules)
-1. วิเคราะห์เฉพาะข้อมูลจากไฟล์ PDF ที่แนบมาในคำสั่งปัจจุบันเท่านั้น ห้ามคาดเดาหรือนำข้อมูลจากแหล่งอื่นมาปะปนโดยเด็ดขาด หากส่วนใดไม่มีข้อมูลในเอกสาร ให้ระบุว่า "ไม่ปรากฏข้อมูลในเอกสารรายงาน"
-2. ตรวจสอบความสอดคล้องของตัวเลข (Cross-Check) ระหว่าง "รายงานการประชุมใหญ่สามัญประจำปี" กับ "งบการเงินและรายงานของผู้สอบบัญชี (สำนักงานตรวจบัญชีสหกรณ์)" เสมอ หากพบตัวเลขขัดแย้งกัน เช่น ยอดจัดสรรกำไรไม่ตรงกัน หรือมีการกำหนดวงเงินกู้ยืม/ค้ำประกันต่ำกว่ายอดดำเนินธุรกิจจริง ให้ระบุเป็นประเด็นข้อสังเกตอย่างชัดเจนทันที
-3. ใช้ภาษาราชการที่กระชับ ตรงไปตรงมา ชัดเจน ไม่อ้อมค้อม อิงระเบียบนายทะเบียนสหกรณ์และพระราชบัญญัติสหกรณ์ พ.ศ. 2542 และที่แก้ไขเพิ่มเติม
-
-# โครงสร้างการวิเคราะห์ที่ต้องส่งออก (5 ส่วนหลักตาม JSON Schema)
-1. ด้านข้อมูลทั่วไปและตัวเลขสำคัญ (org_info)
-2. ด้านการบริหารจัดการองค์กร (management_4m)
-3. ด้านการบริหารจัดการธุรกิจ (business_analysis)
-4. ด้านการจัดสวัสดิการและสาธารณประโยชน์ (welfare_analysis)
-5. สรุปผลการวิเคราะห์และเป้าหมายการส่งเสริม CPS (cps_summary_and_audit)`;
+# กฎเหล็กและมาตรฐานการวิเคราะห์ (Strict Forensic Rules)
+1. วิเคราะห์เฉพาะข้อมูลที่ปรากฏจริงในไฟล์ PDF ห้ามคาดเดาตัวเลขทางการเงิน หากไม่มีให้ระบุ "ไม่ปรากฏข้อมูลในเอกสารรายงาน"
+2. Forensic Cross-Check: ตรวจสอบความสอดคล้องระหว่างมติที่ประชุมใหญ่ vs งบการเงิน (วงเงินกู้ยืมและค้ำประกันประจำปี, การจัดสรรกำไรสุทธิตาม พ.ร.บ. สหกรณ์ มาตรา 60 เรื่องกันทุนสำรอง 10%, ยอดหนี้ผิดนัดชำระ vs การตั้งค่าเผื่อหนี้สงสัยจะสูญ)
+3. ประเมินชั้นความเข้มแข็งของสหกรณ์ (ชั้น 1: เข้มแข็งมาก, ชั้น 2: เข้มแข็งปานกลาง, ชั้น 3: ต้องปรับปรุง)
+4. จัดระดับความเสี่ยงของข้อสังเกตผู้สอบบัญชี สตส. ทุกข้อเป็น CRITICAL, WARNING, หรือ ADVISORY พร้อมระบุประเด็น ผลกระทบ และข้อเสนอแนะ
+5. แผนส่งเสริม CPS ต้องระบุเป้าหมาย (goal), มาตรการส่งเสริมของเจ้าหน้าที่ (action_plan), และตัวชี้วัดความสำเร็จ (target_kpi)
+6. สรุปผล CPS (cps_full_summary_text) ในรูปแบบบันทึกข้อความราชการทางการฉบับสมบูรณ์ พร้อมคัดลอกลงระบบ`;
 
 // Standard JSON Schema for CPS analysis structured output
 const cpsJsonSchema = {
@@ -32,6 +28,10 @@ const cpsJsonSchema = {
       properties: {
         coop_name: { type: "string", description: "ชื่อสหกรณ์หรือกลุ่มเกษตรกร" },
         coop_type: { type: "string", description: "ประเภทสหกรณ์ เช่น สหกรณ์การเกษตร, สหกรณ์ออมทรัพย์" },
+        cooperative_strength_class: {
+          type: "string",
+          description: "ชั้นความเข้มแข็งของสหกรณ์ตามเกณฑ์มาตรฐาน (เช่น 'ชั้น 1 (เข้มแข็งมาก)', 'ชั้น 2 (เข้มแข็งปานกลาง)', 'ชั้น 3 (ต้องปรับปรุงแก้ไข)') พร้อมเหตุผลสั้นๆ",
+        },
         fiscal_year_end: { type: "string", description: "วันสิ้นสุดปีบัญชี เช่น 31 มีนาคม 2567" },
         operating_capital: { type: "string", description: "ทุนดำเนินงานทั้งสิ้น ระบุจำนวนเงินและหน่วย" },
         net_profit: { type: "string", description: "กำไรหรือขาดทุนสุทธิประจำปี" },
@@ -42,7 +42,7 @@ const cpsJsonSchema = {
           items: {
             type: "object",
             properties: {
-              label: { type: "string", description: "ชื่ออัตราส่วน" },
+              label: { type: "string", description: "ชื่ออัตราส่วน เช่น หนี้สินต่อทุน (D/E), ROE, Current Ratio" },
               value: { type: "string", description: "ค่าของอัตราส่วน" },
               interpretation: { type: "string", description: "คำอธิบายหรือเกณฑ์มาตรฐาน" },
             },
@@ -53,6 +53,7 @@ const cpsJsonSchema = {
       required: [
         "coop_name",
         "coop_type",
+        "cooperative_strength_class",
         "fiscal_year_end",
         "operating_capital",
         "net_profit",
@@ -176,30 +177,54 @@ const cpsJsonSchema = {
     cps_summary_and_audit: {
       type: "object",
       properties: {
-        board_performance_summary: { type: "string", description: "สรุปภาพรวมการปฏิบัติงานของคณะกรรมการ" },
+        board_performance_summary: {
+          type: "string",
+          description: "สรุปภาพรวมการปฏิบัติงานของคณะกรรมการดำเนินการ ความเป็นผู้นำ และการปฏิบัติตามมติที่ประชุมใหญ่",
+        },
         promotion_goals_next_year: {
           type: "array",
-          items: { type: "string" },
-          description: "เป้าหมายในการส่งเสริมปีงบประมาณถัดไป (CPS Goals)"
+          items: {
+            type: "object",
+            properties: {
+              goal: { type: "string", description: "เป้าหมายการส่งเสริมสหกรณ์ในปีงบประมาณถัดไป" },
+              action_plan: { type: "string", description: "มาตรการและกิจกรรมส่งเสริมของเจ้าหน้าที่ส่งเสริมสหกรณ์" },
+              target_kpi: { type: "string", description: "ตัวชี้วัดความสำเร็จและกรอบเวลาในการดำเนินงาน" },
+            },
+            required: ["goal", "action_plan", "target_kpi"],
+          },
+          description: "เป้าหมายและแผนปฏิบัติการส่งเสริม CPS ปีงบประมาณถัดไป",
         },
         strengths: {
           type: "array",
           items: { type: "string" },
-          description: "จุดเด่นของสหกรณ์/กลุ่มเกษตรกร"
+          description: "จุดเด่นและศักยภาพของสหกรณ์/กลุ่มเกษตรกร",
         },
         weaknesses: {
           type: "array",
           items: { type: "string" },
-          description: "จุดอ่อนหรือข้อบกพร่องที่ต้องแก้ไข"
+          description: "จุดอ่อนหรือข้อบกพร่องที่ต้องเร่งแก้ไข",
         },
         auditor_observations: {
           type: "array",
-          items: { type: "string" },
-          description: "ข้อสังเกตของผู้สอบบัญชี สตส. ครบทุกประเด็น"
+          items: {
+            type: "object",
+            properties: {
+              severity: {
+                type: "string",
+                enum: ["CRITICAL", "WARNING", "ADVISORY"],
+                description: "ระดับความรุนแรง: CRITICAL (วิกฤต/ข้อบกพร่องตามกฎหมาย), WARNING (เตือนภัย/ความเสี่ยงสูง), ADVISORY (ข้อเสนอแนะเชิงพัฒนา)",
+              },
+              issue: { type: "string", description: "ประเด็นข้อสังเกตหรือข้อบกพร่องจากรายงานของผู้สอบบัญชี สตส." },
+              impact: { type: "string", description: "ผลกระทบต่อฐานะการเงิน การดำเนินธุรกิจ หรือสมาชิก" },
+              recommendation: { type: "string", description: "แนวทางแก้ไขและข้อเสนอแนะของผู้สอบบัญชีหรือเจ้าหน้าที่" },
+            },
+            required: ["severity", "issue", "impact", "recommendation"],
+          },
+          description: "ข้อสังเกตและข้อเสนอแนะของผู้สอบบัญชี สตส. จำแนกตามระดับความรุนแรง",
         },
         cps_full_summary_text: {
           type: "string",
-          description: "บทสรุป CPS ฉบับสมบูรณ์สำหรับคัดลอกลงระบบ CPS ของกรมส่งเสริมสหกรณ์ได้ทันที"
+          description: "บทสรุปผลการวิเคราะห์ CPS ฉบับสมบูรณ์ ในรูปแบบบันทึกข้อความทางการ สำหรับคัดลอกลงระบบ CPS",
         },
       },
       required: [

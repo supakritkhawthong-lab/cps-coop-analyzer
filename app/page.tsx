@@ -481,10 +481,16 @@ export default function CPSAnalyzerPage() {
             {/* Top Banner: Coop Profile */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                     {analysisResult.org_info.coop_type || "สหกรณ์"}
                   </span>
+                  {analysisResult.org_info.cooperative_strength_class && (
+                    <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Award className="w-3.5 h-3.5 text-emerald-700" />
+                      {analysisResult.org_info.cooperative_strength_class}
+                    </span>
+                  )}
                   <span className="text-xs text-slate-500">
                     วันสิ้นปีบัญชี: <strong>{analysisResult.org_info.fiscal_year_end || "-"}</strong>
                   </span>
@@ -1003,36 +1009,128 @@ export default function CPSAnalyzerPage() {
                 </div>
 
                 {/* Auditor Observations */}
-                <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200 shadow-sm space-y-3">
-                  <div className="flex items-center gap-2 text-amber-900 font-bold pb-2 border-b border-amber-200/60">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
-                    <h4>ข้อสังเกตและข้อเสนอแนะของผู้สอบบัญชี (สำนักงานตรวจบัญชีสหกรณ์ สตส.)</h4>
+                <div className="bg-amber-50/50 rounded-2xl p-6 border border-amber-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-amber-200/60">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold">
+                      <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      <h4>ข้อสังเกตและข้อเสนอแนะของผู้สอบบัญชี (สำนักงานตรวจบัญชีสหกรณ์ สตส.)</h4>
+                    </div>
+                    <span className="text-xs text-amber-800 bg-amber-100/70 px-2.5 py-1 rounded-full font-medium">
+                      จำแนกตามระดับความเสี่ยง
+                    </span>
                   </div>
-                  <ul className="space-y-2.5 pt-1">
-                    {analysisResult.cps_summary_and_audit.auditor_observations.map((obs, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-800 bg-white/70 p-3 rounded-xl border border-amber-200/40">
-                        <span className="bg-amber-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] flex-shrink-0 font-bold mt-0.5">
-                          {idx + 1}
-                        </span>
-                        <span className="leading-relaxed">{obs}</span>
-                      </li>
-                    ))}
+                  <ul className="space-y-3 pt-1">
+                    {analysisResult.cps_summary_and_audit.auditor_observations.map((obs, idx) => {
+                      if (typeof obs === "string") {
+                        return (
+                          <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-800 bg-white/70 p-3.5 rounded-xl border border-amber-200/40">
+                            <span className="bg-amber-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] flex-shrink-0 font-bold mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <span className="leading-relaxed">{obs}</span>
+                          </li>
+                        );
+                      }
+
+                      const severity = obs.severity?.toUpperCase() || "ADVISORY";
+                      const isCritical = severity === "CRITICAL";
+                      const isWarning = severity === "WARNING";
+
+                      return (
+                        <li
+                          key={idx}
+                          className={`p-4 rounded-xl border space-y-2.5 transition shadow-2xs ${
+                            isCritical
+                              ? "bg-rose-50/80 border-rose-300"
+                              : isWarning
+                              ? "bg-amber-50/80 border-amber-300"
+                              : "bg-blue-50/70 border-blue-200"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span
+                              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                                isCritical
+                                  ? "bg-rose-600 text-white"
+                                  : isWarning
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-blue-600 text-white"
+                              }`}
+                            >
+                              {isCritical && <AlertCircle className="w-3.5 h-3.5" />}
+                              {isWarning && <AlertTriangle className="w-3.5 h-3.5" />}
+                              {!isCritical && !isWarning && <CheckCircle2 className="w-3.5 h-3.5" />}
+                              {isCritical
+                                ? "วิกฤต / ข้อบกพร่องตามกฎหมาย"
+                                : isWarning
+                                ? "เตือนภัย / จุดเสี่ยงสูง"
+                                : "ข้อเสนอแนะเชิงพัฒนา"}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-400">ประเด็นที่ {idx + 1}</span>
+                          </div>
+
+                          <div className="text-sm font-bold text-slate-900 leading-snug">
+                            {obs.issue}
+                          </div>
+
+                          {obs.impact && (
+                            <div className="text-xs text-slate-700 bg-white/80 p-2.5 rounded-lg border border-slate-200/60 leading-relaxed">
+                              <strong className="text-slate-900">ผลกระทบต่อสหกรณ์:</strong> {obs.impact}
+                            </div>
+                          )}
+
+                          {obs.recommendation && (
+                            <div className="text-xs text-emerald-900 bg-emerald-50/90 p-2.5 rounded-lg border border-emerald-200/80 leading-relaxed">
+                              <strong className="text-emerald-950">แนวทางแก้ไขและข้อเสนอแนะ:</strong> {obs.recommendation}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 
                 {/* Next Year Promotion Goals */}
-                <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200 shadow-sm space-y-3">
-                  <div className="flex items-center gap-2 text-blue-900 font-bold pb-2 border-b border-blue-200/60">
-                    <Award className="w-5 h-5 text-blue-700" />
-                    <h4>เป้าหมายในการส่งเสริมปีงบประมาณถัดไป (CPS Goals)</h4>
+                <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-blue-200/60">
+                    <div className="flex items-center gap-2 text-blue-900 font-bold">
+                      <Award className="w-5 h-5 text-blue-700" />
+                      <h4>เป้าหมายและแผนปฏิบัติการส่งเสริมปีงบประมาณถัดไป (CPS Action Plan)</h4>
+                    </div>
+                    <span className="text-xs text-blue-800 bg-blue-100/70 px-2.5 py-1 rounded-full font-medium">
+                      แผนงานเชิงรุก 5W1H
+                    </span>
                   </div>
-                  <ul className="space-y-2 pt-1">
-                    {analysisResult.cps_summary_and_audit.promotion_goals_next_year.map((goal, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-800">
-                        <CheckCircle2 className="w-4 h-4 text-blue-700 flex-shrink-0 mt-0.5" />
-                        <span>{goal}</span>
-                      </li>
-                    ))}
+                  <ul className="space-y-3 pt-1">
+                    {analysisResult.cps_summary_and_audit.promotion_goals_next_year.map((goal, idx) => {
+                      if (typeof goal === "string") {
+                        return (
+                          <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-800">
+                            <CheckCircle2 className="w-4 h-4 text-blue-700 flex-shrink-0 mt-0.5" />
+                            <span>{goal}</span>
+                          </li>
+                        );
+                      }
+
+                      return (
+                        <li key={idx} className="bg-white p-4 rounded-xl border border-blue-100 shadow-2xs space-y-2">
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-blue-700 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm font-bold text-blue-950">{goal.goal}</span>
+                          </div>
+                          <div className="text-xs text-slate-700 pl-6 leading-relaxed">
+                            <strong className="text-slate-900">มาตรการ/กิจกรรมส่งเสริมของเจ้าหน้าที่:</strong> {goal.action_plan}
+                          </div>
+                          {goal.target_kpi && (
+                            <div className="pl-6 pt-1">
+                              <span className="inline-block bg-blue-50 text-blue-800 text-[11px] font-semibold px-2.5 py-1 rounded-md border border-blue-200">
+                                🎯 ตัวชี้วัดและกรอบเวลา: {goal.target_kpi}
+                              </span>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 
